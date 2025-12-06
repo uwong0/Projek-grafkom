@@ -1,1 +1,0 @@
-<?php header('Location: metamorfosis_katak_png_viewer.html'); ?>
