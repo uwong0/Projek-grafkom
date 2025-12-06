@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Metamorfosis Katak — Clickable & Transparent (dengan garis)</title>
+
+  <!-- Local uploaded file (contoh path yang tersedia di server) -->
+  <!-- LOCAL_FILE_URL: /mnt/data/telur.png -->
+
+  <style>
+    html,body{
+      height:100%;
+      margin:0;
+      font-family:Inter, system-ui, sans-serif;
+      background:#071224;
+      color:#e6eef8;
+    }
+    #app{
+      display:grid;
+      grid-template-columns:1fr 400px;
+      gap:12px;
+      height:100vh;
+      padding:12px;
+      box-sizing:border-box;
+    }
+    #scene{
+      border-radius:12px;
+      overflow:hidden;
+      background:linear-gradient(180deg,#071024 0%,#0b1a2b 100%);
+      position:relative;
+    }
+    #panel{
+      padding:16px;
+      border-radius:12px;
+      background:linear-gradient(180deg,#081028,#0e2136);
+      box-shadow:0 6px 30px rgba(2,6,23,0.8);
+      overflow:auto;
+    }
+    h1{
+      font-size:20px;
+      margin-bottom:10px;
+      color:#ffd27a;
+    }
+    .stage-title{
+      font-size:18px;
+      font-weight:700;
+      margin-bottom:6px;
+    }
+    .stage-img{
+      width:100%;
+      height:230px;
+      object-fit:contain;
+      background:rgba(255,255,255,0.05);
+      border-radius:10px;
+      margin-bottom:10px;
+      display:none;
+    }
+    .stage-desc{
+      white-space:pre-wrap;
+      background:rgba(255,255,255,0.05);
+      padding:14px;
+      border-radius:10px;
+      font-size:15px;
+      line-height:1.45;
+    }
+    .controls button{
+      background:#1f2937;
+      color:#fff;
+      padding:8px 12px;
+      border:0;
+      border-radius:8px;
+      cursor:pointer;
+      margin-right:8px;
+    }
+    #infoBox{
+      position:absolute;
+      bottom:12px;
+      left:12px;
+      background:rgba(2,6,23,0.6);
+      padding:8px 12px;
+      border-radius:10px;
+      backdrop-filter:blur(6px);
+      font-size:13px;
+    }
+    .node-item{
+      background:rgba(255,255,255,0.03);
+      padding:10px;
+      border-radius:8px;
+      margin-bottom:6px;
+      cursor:pointer;
+    }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <div id="scene">
+    <div id="infoBox">Klik gambar di 3D scene untuk melihat deskripsi lengkap.</div>
+  </div>
+
+  <div id="panel">
+    <h1>Metamorfosis Katak</h1>
+
+    <div id="stageName" class="stage-title">Pilih tahap pada scene</div>
+    <img id="stageImage" class="stage-img" />
+
+    <div id="stageDesc" class="stage-desc">
+      Klik salah satu gambar di kiri untuk menampilkan penjelasan lengkap pada tahap tersebut.
+    </div>
+
+    <div class="controls" style="margin-top:15px;">
+      <button id="resetCamera">Reset Kamera</button>
+      <button id="fitAll">Pusatkan Semua</button>
+    </div>
+
+    <h3 style="margin-top:18px;">Daftar Tahapan:</h3>
+    <div id="nodeList"></div>
+  </div>
+</div>
+
+<!-- THREE JS (UMD) -->
+<script src="https://unpkg.com/three@0.140.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.140.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+
+// ---- Data tahap (deskripsi panjang) ----
+const stages = [
+  {
+    id: "Telur",
+    image: "./models/telur.png",
+    desc:
+`Tahap Telur
+• Telur diletakkan berkelompok di air, dilindungi oleh lapisan jelly.
+• Embrio berkembang perlahan, sensitif terhadap suhu dan kualitas air.
+• Predator umum: ikan kecil, larva serangga, kecebong lain.
+
+Lama Waktu:
+• 3–21 hari tergantung suhu (lebih hangat → lebih cepat).`
+  },
+  {
+    id: "Kecebong",
+    image: "./models/kecebong.png",
+    desc:
+`Tahap Kecebong
+• Menetas dari telur dan hidup sepenuhnya di air.
+• Bernapas menggunakan insang.
+• Memakan ganggang, lumut, dan sisa organik.
+• Ekornya panjang untuk berenang.
+
+Lama Waktu:
+• 2–8 minggu tergantung spesies dan kondisi air.`
+  },
+  {
+    id: "Kecebong Berkaki",
+    image: "./models/kecebong_berkaki.png",
+    desc:
+`Tahap Kecebong Berkaki
+• Kaki belakang mulai tumbuh, disusul kaki depan.
+• Paru mulai terbentuk, kecebong muncul di permukaan.
+• Sistem pencernaan berubah dari herbivora → karnivora.
+• Ekor mulai menyusut perlahan karena reabsorpsi.
+
+Lama Waktu:
+• 1–3 minggu sebelum masuk fase froglet.`
+  },
+  {
+    id: "Froglet",
+    image: "./models/froglet.png",
+    desc:
+`Tahap Froglet (Katak Muda)
+• Sudah memiliki empat kaki lengkap.
+• Ekor mengecil hingga hampir hilang, menjadi sumber energi tambahan.
+• Mulai hidup di darat tetapi tetap sering ke air.
+• Paru berkembang penuh.
+
+Lama Waktu:
+• Beberapa hari hingga beberapa minggu.`
+  },
+  {
+    id: "Katak Dewasa",
+    image: "./models/katak_dewasa.png",
+    desc:
+`Tahap Katak Dewasa
+• Memiliki kaki belakang kuat untuk melompat.
+• Paru-paru berfungsi penuh, namun kulit juga membantu pernapasan.
+• Makan serangga, cacing, dan invertebrata kecil.
+• Siap bereproduksi dan memulai siklus kembali dari telur.
+
+Lama Waktu:
+• Mencapai dewasa penuh dalam beberapa bulan–1 tahun.`
+  }
+];
+
+// ---- Scene setup ----
+const container = document.getElementById('scene');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x071224);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(container.clientWidth, container.clientHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+container.appendChild(renderer.domElement);
+
+const camera = new THREE.PerspectiveCamera(45, container.clientWidth/container.clientHeight, 0.1, 1000);
+camera.position.set(0,10,30);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+scene.add(new THREE.HemisphereLight(0xddeeff, 0x082033, 1));
+const dir = new THREE.DirectionalLight(0xffffff, 0.5);
+dir.position.set(5,10,5);
+scene.add(dir);
+
+// ---- Layout positions ----
+const positions = [];
+for(let i=0;i<stages.length;i++){
+  const t = i / (stages.length - 1);
+  positions.push(new THREE.Vector3((t - 0.5)*16, (t - 0.5)*10, Math.sin(t*Math.PI)*-3));
+}
+
+// ---- Nodes & loaders ----
+const nodeInfo = [];
+const loader = new THREE.TextureLoader();
+const nodeGroup = new THREE.Group();
+scene.add(nodeGroup);
+
+for(let i=0;i<stages.length;i++){
+  const root = new THREE.Group();
+  root.position.copy(positions[i]);
+  nodeGroup.add(root);
+
+  // Visible plane (initial size 3x3, will be resized once texture loads)
+  const plane = new THREE.Mesh(
+    new THREE.PlaneGeometry(3,3),
+    new THREE.MeshBasicMaterial({ transparent:true })
+  );
+  plane.visible = false;
+  root.add(plane);
+
+  // Invisible collider slightly larger than plane so clicks register reliably
+  const hit = new THREE.Mesh(
+    new THREE.PlaneGeometry(3.6, 3.6),
+    new THREE.MeshBasicMaterial({ opacity:0.01, transparent:true })
+  );
+  hit.position.z = 0.05; // front to avoid z-fighting
+  root.add(hit);
+
+  nodeInfo.push({ root, plane, hit });
+
+  // lazy load texture and resize plane & collider to aspect
+  (function(index){
+    const img = stages[index].image;
+    if(!img){ return; }
+    loader.load(img, tex=>{
+      const aspect = tex.image.width / tex.image.height;
+      // plane width scaled by aspect to keep height = 3 world units
+      const width = 3 * aspect;
+      plane.geometry.dispose();
+      plane.geometry = new THREE.PlaneGeometry(width, 3);
+      plane.material.map = tex;
+      plane.material.needsUpdate = true;
+      plane.visible = true;
+
+      hit.geometry.dispose();
+      hit.geometry = new THREE.PlaneGeometry(width * 1.1, 3.3);
+    }, undefined, err=>{
+      console.warn('Gagal load image', img, err);
+    });
+  })(i);
+}
+
+// ---- Connecting line between nodes ----
+const linePoints = positions.map(p => new THREE.Vector3(p.x, p.y, p.z));
+const lineGeometry = new THREE.BufferGeometry().setFromPoints(linePoints);
+const lineMaterial = new THREE.LineBasicMaterial({ color: 0x6aa9ff });
+const connectionLine = new THREE.Line(lineGeometry, lineMaterial);
+scene.add(connectionLine);
+
+// ---- Raycaster & interaction ----
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+function pointerMove(e){
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((e.clientX-rect.left)/rect.width)*2 - 1;
+  mouse.y = -((e.clientY-rect.top)/rect.height)*2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+
+  const hits = raycaster.intersectObjects(nodeInfo.map(n=>n.hit), false);
+  renderer.domElement.style.cursor = hits.length>0 ? 'pointer' : 'default';
+}
+container.addEventListener('pointermove', pointerMove);
+
+container.addEventListener('pointerdown', e=>{
+  // use pointerMove to set mouse coords & ray
+  pointerMove(e);
+  const hits = raycaster.intersectObjects(nodeInfo.map(n=>n.hit), false);
+  if(hits.length === 0) return;
+  const mesh = hits[0].object;
+  const index = nodeInfo.findIndex(n=>n.hit === mesh);
+  if(index !== -1) selectNode(index);
+});
+
+// ---- Select node: update right panel & focus camera ----
+function selectNode(i){
+  document.getElementById("stageName").textContent = stages[i].id;
+  document.getElementById("stageImage").src = stages[i].image;
+  document.getElementById("stageImage").style.display = "block";
+  document.getElementById("stageDesc").textContent = stages[i].desc;
+
+  // smooth-ish camera focus (simple set here)
+  const target = nodeInfo[i].root.getWorldPosition(new THREE.Vector3());
+  controls.target.copy(target);
+  camera.position.set(target.x + 6, target.y + 4, target.z + 10);
+  // update infoBox
+  document.getElementById('infoBox').textContent = `Terpilih: ${stages[i].id}`;
+}
+
+// ---- Populate right-hand list ----
+const nodeList = document.getElementById("nodeList");
+stages.forEach((s,i)=>{
+  const d = document.createElement("div");
+  d.className = "node-item";
+  d.textContent = s.id;
+  d.onclick = ()=>selectNode(i);
+  nodeList.appendChild(d);
+});
+
+// ---- Buttons ----
+document.getElementById("resetCamera").onclick = ()=>{
+  camera.position.set(0,10,30);
+  controls.target.set(0,0,0);
+  document.getElementById('infoBox').textContent = 'Klik gambar di 3D scene untuk melihat deskripsi lengkap.';
+};
+document.getElementById("fitAll").onclick = ()=>{
+  // simple fit: position back and center
+  camera.position.set(20,10,40);
+  controls.target.set(0,0,0);
+};
+
+// ---- Resize handling ----
+window.addEventListener('resize', ()=>{
+  renderer.setSize(container.clientWidth, container.clientHeight);
+  camera.aspect = container.clientWidth / container.clientHeight;
+  camera.updateProjectionMatrix();
+});
+
+// ---- Animate loop ----
+function animate(){
+  requestAnimationFrame(animate);
+
+  // Optional: make each plane face the camera (billboard)
+  nodeInfo.forEach(n=>{
+    if(n.plane.visible) n.plane.lookAt(camera.position);
+  });
+
+  // update connection line to match node positions (in case nodes move)
+  const pts = nodeInfo.map(n => n.root.position.clone());
+  connectionLine.geometry.setFromPoints(pts);
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// initial select first node after a short delay
+setTimeout(()=> selectNode(0), 600);
+
+</script>
+
+</body>
+</html>
