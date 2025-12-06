@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>Metamorfosis Katak</title>
+<style>
+body { margin:0; background:#f0f0f0; font-family:Arial; text-align:center;}
+#stageText{position:absolute; top:20px; left:0; right:0; font-size:24px; font-weight:bold;}
+canvas{display:block; margin:auto;}
+</style>
+</head>
+<body>
+<div id="stageText">Kecebong</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// setup scene
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight,0.1,1000);
+const renderer=new THREE.WebGLRenderer({alpha:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// stages
+const stages=[
+ {name:"Kecebong", img:"models/kecebong.png"},
+ {name:"Kecebong Berkaki", img:"models/kecebong_berkaki.png"},
+ {name:"Froglet", img:"models/froglet.png"},
+ {name:"Katak Dewasa", img:"models/katak_dewasa.png"},
+];
+let index=0;
+
+// plane
+const textureLoader=new THREE.TextureLoader();
+let texture=textureLoader.load(stages[index].img);
+let material=new THREE.MeshBasicMaterial({map:texture, transparent:true});
+let geometry=new THREE.PlaneGeometry(5,5);
+let plane=new THREE.Mesh(geometry, material);
+scene.add(plane);
+camera.position.z=6;
+
+document.getElementById("stageText").innerText=stages[index].name;
+
+window.addEventListener("click", ()=>{
+ index=(index+1)%stages.length;
+ textureLoader.load(stages[index].img, tex=>{
+     material.map=tex;
+     material.needsUpdate=true;
+ });
+ document.getElementById("stageText").innerText=stages[index].name;
+});
+
+// animate
+function animate(){
+ requestAnimationFrame(animate);
+ plane.rotation.y +=0.01;
+ renderer.render(scene,camera);
+}
+animate();
+</script>
+</body>
+</html>
